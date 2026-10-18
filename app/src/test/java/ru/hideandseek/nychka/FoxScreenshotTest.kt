@@ -54,7 +54,7 @@ class FoxScreenshotTest {
     private val noon = ZonedDateTime.of(2026, 11, 3, 12, 0, 0, 0, ZoneId.of("Europe/Moscow"))
         .toInstant().toEpochMilli()
 
-    private class Spot(val id: String, val edge: String = "top", val align: Double = 0.5)
+    private class Spot(val id: String, val edge: String = "top", val align: Double = 0.5, val run: String? = null)
 
     private fun bundledContent(): JSONObject {
         val app = RuntimeEnvironment.getApplication()
@@ -70,7 +70,11 @@ class FoxScreenshotTest {
         json.put(
             "spots",
             JSONArray().apply {
-                for (spot in spots) put(JSONObject().put("id", spot.id).put("edge", spot.edge).put("align", spot.align))
+                for (spot in spots) {
+                    val o = JSONObject().put("id", spot.id).put("edge", spot.edge).put("align", spot.align)
+                    if (spot.run != null) o.put("run", spot.run)
+                    put(o)
+                }
             },
         )
         json.put(
@@ -303,6 +307,16 @@ class FoxScreenshotTest {
         compose.onNodeWithText("Нашёл!").assertExists()
         val top = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
         assertTrue("карточка на $top", top < 100.dp)
+    }
+
+    /** Место у правого края экрана: лиса выглядывает из-за края и после находки убегает влево. */
+    @Test
+    fun screenEdgeRightRunsLeft() {
+        show(Tab.Main, contentWith(listOf(Spot("main.edge_right", "left", 0.3, run = "left"))))
+        capture("33_fox_screen_edge")
+        find()
+        advance(1_800)
+        capture("34_fox_screen_edge_runs_left")
     }
 
     @Test
