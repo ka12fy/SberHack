@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "enabled": true,
   "timeZone": "Europe/Moscow",
   "salt": "nychka-2026",
@@ -76,6 +76,11 @@
     { "text": "Подарочные деньги на Новый год — отличный старт для копилки.", "from": "2026-12-15", "to": "2027-01-15" }
   ],
 
+  "demo": {
+    "script": ["main.banner", "heist", "piggy.pig", "tasks.start_card", "content.hero", "main.edge_right", "piggy.goal"],
+    "loop": true
+  },
+
   "specialDays": [
     { "date": "2026-10-18", "creature": "nychka", "spot": "main.banner" },
     { "date": "2026-10-19", "creature": "nychka", "spot": "piggy.goal" },
@@ -84,7 +89,7 @@
 
   "texts": {
     "foundTitle": "Нашёл!",
-    "foundBody": "Вот где было укрытие! Завтра {name} спрячется в другом месте.",
+    "foundBody": "Завтра {name} спрячется в другом месте.",
     "streak": "Ты находишь меня {streakDays} подряд!",
     "tipTitle": "Совет дня",
     "accessibilityLabel": "Здесь кто-то прячется. Нажми, чтобы найти"

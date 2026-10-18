@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -57,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import ru.hideandseek.nychka.R
+import ru.hideandseek.nychka.heist.AMOUNT_STRETCH
+import ru.hideandseek.nychka.heist.BALANCE_AMOUNT_SPOT
+import ru.hideandseek.nychka.heist.LocalBalanceHeist
 import ru.hideandseek.nychka.hidespots.ScreenEdgeSpot
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.hidespots.noHideZone
@@ -170,6 +174,7 @@ private fun CardWithBalance() {
 
 @Composable
 private fun BalancePlate(modifier: Modifier = Modifier) {
+    val heist = LocalBalanceHeist.current
     Row(
         modifier = modifier
             .tappable(RoundedCornerShape(22.dp), pressedScale = 0.98f)
@@ -183,7 +188,17 @@ private fun BalancePlate(modifier: Modifier = Modifier) {
                 withStyle(SpanStyle(color = KidsColors.Kopecks)) { append(",04 ₽") }
             },
             style = KidsType.Balance,
-            modifier = Modifier.padding(start = 25.dp),
+            modifier = Modifier
+                .padding(start = 25.dp)
+                // Метка суммы (за её край тянет Нычка в приколе) — до растяжения, чтобы координаты были «как есть».
+                .noHideZone(BALANCE_AMOUNT_SPOT)
+                .graphicsLayer {
+                    // Прикол «Нычка ворует баланс»: сумма тянется вправо, к лисе, и щёлкает обратно.
+                    val s = heist?.stretch ?: 0f
+                    scaleX = 1f + AMOUNT_STRETCH * s
+                    scaleY = 1f - 0.05f * s
+                    transformOrigin = TransformOrigin(0f, 0.5f)
+                },
         )
         Spacer(Modifier.weight(1f))
         Row(

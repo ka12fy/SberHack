@@ -21,13 +21,20 @@ import ru.hideandseek.nychka.ui.theme.NychkaTheme
  */
 object NychkaConfig {
     const val CONTENT_URL =
-        "https://raw.githubusercontent.com/ka12fy/SberHack/main/content/hideandseek.json"
+        "https://raw.githubusercontent.com/ka12fy/Final-Demo-Repo/main/content/hideandseek.json"
 
     /**
      * Режим демо для защиты: после находки Нычка сразу прячется в другом месте
      * (а не ждёт завтра). Переключается и в панели демо. В настоящем приложении — false.
      */
-    const val DEMO_REHIDE = false
+    const val DEMO_REHIDE = true
+
+    /**
+     * Прикол «Нычка ворует баланс»: через столько мс после запуска на «Главном» Нычка крадётся к сумме
+     * на плашке баланса и пытается её утащить. В демо 0: кража идёт по сценарию показа
+     * (шаг "heist" в `content/hideandseek.json`) и кнопкой в панели демо.
+     */
+    const val HEIST_AUTOSTART_MS = 0L
 }
 
 class MainActivity : ComponentActivity() {
@@ -44,7 +51,7 @@ class MainActivity : ComponentActivity() {
                 val hideAndSeek = rememberHideAndSeekController(contentUrl = NychkaConfig.CONTENT_URL)
                 LaunchedEffect(hideAndSeek) { hideAndSeek.demoRehide = NychkaConfig.DEMO_REHIDE }
                 HideAndSeekHost(hideAndSeek, Modifier.fillMaxSize()) {
-                    AppRoot()
+                    AppRoot(heistAutoStartMs = NychkaConfig.HEIST_AUTOSTART_MS)
                 }
             }
         }

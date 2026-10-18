@@ -164,6 +164,33 @@ class CoreTest {
         }
     }
 
+    // ---- Demo script ----
+
+    @Test
+    fun demoScriptParses() {
+        val parsed = ContentParser.parse(
+            """
+            { "spots": [{ "id": "a" }, { "id": "b" }],
+              "demo": { "script": ["b", " a ", "", 5, "missing"], "loop": false } }
+            """.trimIndent(),
+        )
+        assertEquals(listOf("b", "a", "missing"), parsed.demoScript)
+        assertFalse(parsed.demoLoop)
+        val none = ContentParser.parse("""{ "spots": [{ "id": "a" }] }""")
+        assertTrue(none.demoScript.isEmpty())
+        assertTrue(none.demoLoop)
+    }
+
+    @Test
+    fun sampleDemoScriptUsesKnownSpots() {
+        val file = listOf(File("../content/hideandseek.json"), File("content/hideandseek.json"))
+            .firstOrNull { it.exists() } ?: return
+        val sample = ContentParser.parse(file.readText())
+        assertTrue(sample.demoScript.isNotEmpty())
+        // "heist" — шаг-действие приложения (кража баланса), остальное — места из контента.
+        for (id in sample.demoScript) if (id != "heist") assertNotNull(id, sample.spot(id))
+    }
+
     @Test
     fun spotRunDirectionParses() {
         val parsed = ContentParser.parse(

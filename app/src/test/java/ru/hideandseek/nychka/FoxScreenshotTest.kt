@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -62,7 +63,7 @@ class FoxScreenshotTest {
     }
 
     /** Встроенный контент, но только Нычка, только эти места и (если задано) место дня. */
-    private fun contentWith(spots: List<Spot>, spotOfTheDay: String? = null): String {
+    private fun contentWith(spots: List<Spot>, spotOfTheDay: String? = null, demoScript: List<String>? = null): String {
         val json = bundledContent()
         val creatures = json.getJSONArray("creatures")
         val nychka = (0 until creatures.length()).map { creatures.getJSONObject(it) }.first { it.getString("id") == "nychka" }
@@ -84,6 +85,10 @@ class FoxScreenshotTest {
             },
         )
         json.getJSONObject("look").put("appearDelayMs", 0)
+        json.remove("demo")
+        if (demoScript != null) {
+            json.put("demo", JSONObject().put("script", JSONArray().apply { demoScript.forEach { put(it) } }))
+        }
         return json.toString()
     }
 
@@ -307,6 +312,89 @@ class FoxScreenshotTest {
         compose.onNodeWithText("Нашёл!").assertExists()
         val top = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
         assertTrue("карточка на $top", top < 100.dp)
+    }
+
+    /** Демо: серия растёт с каждой находкой, строка о ней — в плашке, на 3 — праздник. */
+    @Test
+    fun streakGrowsWithEveryFind() {
+        val json = contentWith(
+            listOf(Spot("main.banner", align = 0.85), Spot("main.card", align = 0.75)),
+            spotOfTheDay = "main.banner",
+        )
+        val controller = show(Tab.Main, json)
+        compose.runOnIdle { controller.demoRehide = true }
+        fun findAndRead(): Int {
+            find()
+            advance(1_000)
+            return controller.progress.streak
+        }
+        assertEquals(1, findAndRead())
+        compose.onAllNodesWithText("подряд", substring = true).fetchSemanticsNodes().let {
+            assertTrue("со первой находки строки о серии нет", it.isEmpty())
+        }
+        swipeCardUp()
+        advance(3_000)
+        assertEquals(2, findAndRead())
+        compose.onNodeWithText("Ты находишь меня 2 дня подряд!", substring = true).assertExists()
+        capture("31_streak_2")
+        swipeCardUp()
+        advance(3_000)
+        find()
+        advance(800) // звёздочки из огонька в разгаре
+        capture("32_streak_3_milestone")
+        assertEquals(3, controller.progress.streak)
+        compose.onNodeWithText("Ты находишь меня 3 дня подряд!", substring = true).assertExists()
+        compose.runOnIdle { controller.resetStreak() }
+        assertEquals(0, controller.progress.streak)
+    }
+
+    /** Демо: сценарий из контента решает, где лиса: по порядку, а из панели — к следующему месту. */
+    @Test
+    fun scriptDecidesWhereFoxHides() {
+        val json = contentWith(
+            listOf(Spot("main.banner", align = 0.85), Spot("main.card", align = 0.75), Spot("piggy.goal", align = 0.85)),
+            spotOfTheDay = "piggy.goal",
+            demoScript = listOf("main.card", "main.banner", "piggy.goal"),
+        )
+        val controller = show(Tab.Main, json)
+        compose.runOnIdle { controller.demoRehide = true }
+        assertEquals("main.card", controller.plan?.spot?.id) // сценарий важнее места дня
+        advance(2_500)
+        find()
+        advance(500)
+        swipeCardUp()
+        advance(3_000)
+        assertEquals("main.banner", controller.plan?.spot?.id)
+        assertTrue("лиса снова выглядывает", foxShown())
+        compose.runOnIdle { controller.demoStepBy(1) }
+        assertEquals("piggy.goal", controller.plan?.spot?.id)
+        compose.runOnIdle { controller.demoStepBy(1) }
+        assertEquals("main.card", controller.plan?.spot?.id) // по кругу
+    }
+
+    /** Сценарий показа: первое место → кража баланса → следующее место; и всё заново из панели. */
+    @Test
+    fun scriptWithHeistStep() {
+        val json = contentWith(
+            listOf(Spot("main.banner", align = 0.85), Spot("main.card", align = 0.75)),
+            demoScript = listOf("main.banner", "heist", "main.card"),
+        )
+        val controller = show(Tab.Main, json)
+        compose.runOnIdle { controller.demoRehide = true }
+        advance(2_500)
+        assertEquals("main.banner", controller.plan?.spot?.id)
+        find()
+        advance(500)
+        swipeCardUp()
+        advance(3_000)
+        assertEquals("heist", controller.demoAction) // лиса не прячется, идёт кража
+        assertEquals(null, controller.plan)
+        capture("35_script_heist")
+        advance(ru.hideandseek.nychka.heist.HEIST_TOTAL_MS.toLong() + 2_000)
+        assertEquals(null, controller.demoAction)
+        assertEquals("main.card", controller.plan?.spot?.id)
+        compose.runOnIdle { controller.restartDemo() }
+        assertEquals("main.banner", controller.plan?.spot?.id)
     }
 
     /** Место у правого края экрана: лиса выглядывает из-за края и после находки убегает влево. */

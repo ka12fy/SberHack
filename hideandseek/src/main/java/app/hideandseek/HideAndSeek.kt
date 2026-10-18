@@ -229,6 +229,64 @@ class HideAndSeekController(
     /** Режим демо: место, куда персонаж перепрятался после последней находки (null — место дня). */
     private var demoSpot: SpotDef? by mutableStateOf(null)
 
+    /** Режим демо: шаг по сценарию из контента (`demo.script`). */
+    private var demoStepState: Int by mutableIntStateOf(0)
+
+    /** Номер текущего места в сценарии демо (с нуля). */
+    val demoStep: Int get() = demoStepState
+
+    /**
+     * Шаги сценария демо, которые не места, а действия приложения (например, `"heist"` — кража баланса).
+     * Их задаёт приложение; пока идёт такой шаг, лиса не прячется, а приложение по окончании
+     * действия вызывает [completeDemoAction].
+     */
+    var demoActions: Set<String> by mutableStateOf(emptySet())
+
+    /** Шаги сценария демо: места из контента и действия из [demoActions] (неизвестные id пропускаются). */
+    val demoScriptSteps: List<String>
+        get() = content?.let { c -> c.demoScript.filter { c.spot(it) != null || it in demoActions } } ?: emptyList()
+
+    /** Места сценария демо, которые есть в контенте. */
+    val demoScriptSpots: List<SpotDef>
+        get() = content?.let { c -> c.demoScript.mapNotNull(c::spot) } ?: emptyList()
+
+    /** Текущий шаг сценария демо; null — сценария нет, он выключен или закончился. */
+    private fun scriptStep(): String? {
+        if (!demoRehide) return null
+        val steps = demoScriptSteps
+        if (steps.isEmpty()) return null
+        val step = demoStepState
+        return when {
+            step < steps.size -> steps[step]
+            content?.demoLoop != false -> steps[step % steps.size]
+            else -> null
+        }
+    }
+
+    /** Место по сценарию демо сейчас; null — сейчас не место (нет сценария или идёт действие). */
+    private fun scriptSpot(): SpotDef? = scriptStep()?.let { content?.spot(it) }
+
+    /** Текущий шаг сценария — действие приложения (например, `"heist"`), а не место. */
+    val demoAction: String?
+        get() = scriptStep()?.takeIf { content?.spot(it) == null }
+
+    /** Приложение закончило действие сценария — дальше следующий шаг. */
+    fun completeDemoAction() {
+        if (demoAction != null) demoStepState++
+    }
+
+    /** Начать сценарий демо заново: с первого шага и с новой серией (находки и коллекция остаются). */
+    fun restartDemo() {
+        demoStepState = 0
+        demoSpot = null
+        demoTip = null
+        progress = progress.copy(
+            streak = 0,
+            lastFoundDay = if (progress.isFound(today)) today - 1 else progress.lastFoundDay,
+        )
+        store.save(progress)
+    }
+
     /** Режим демо: совет для следующей находки — каждый раз другой, а не один на весь день. */
     private var demoTip: String? by mutableStateOf(null)
 
@@ -249,8 +307,15 @@ class HideAndSeekController(
 
     private val planState = derivedStateOf {
         val base = content?.let { DailyPlanner.plan(it, today) }
-        val moved = demoSpot
-        if (base != null && moved != null) base.copy(spot = moved, tip = demoTip ?: base.tip) else base
+        // Режим демо: сценарий из контента важнее случайной перепрятки и места дня.
+        // Пока идёт шаг-действие (кража баланса), лиса не прячется.
+        val moved = scriptSpot() ?: demoSpot
+        when {
+            base == null -> null
+            demoAction != null -> null
+            moved != null -> base.copy(spot = moved, tip = demoTip ?: base.tip)
+            else -> base
+        }
     }
 
     /** Who hides today and where; null when nobody hides today. */
@@ -319,7 +384,14 @@ class HideAndSeekController(
     internal fun markFound(plan: DailyPlan) {
         val current = content ?: return
         if (progress.isFound(plan.day)) return
-        progress = progress.found(plan.day, plan.creature.id, DailyPlanner.previousHidingDay(current, plan.day))
+        // Режим демо: перепрятка считается следующим днём (см. afterFound), поэтому серия
+        // растёт с каждой находкой, а не раз в день.
+        val previous = if (demoRehide && progress.lastFoundDay == plan.day - 1) {
+            plan.day - 1
+        } else {
+            DailyPlanner.previousHidingDay(current, plan.day)
+        }
+        progress = progress.found(plan.day, plan.creature.id, previous)
         store.save(progress)
         onFound?.invoke(plan)
     }
@@ -335,14 +407,20 @@ class HideAndSeekController(
         val current = content ?: return
         val now = plan ?: return
         if (!progress.isFound(now.day)) return
-        val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
-        if (others.isEmpty()) return
-        val screen = screenOf(now.spot.id)
-        val pool = others.filter { screenOf(it.id) != screen }.ifEmpty { others }
-        demoSpot = pickWeighted(pool)
+        // По сценарию — следующее место из списка. Сценария нет (или он кончился) — случайное.
+        val byScript = scriptSpot() != null
+        if (byScript) demoStepState++
+        if (scriptSpot() == null && demoAction == null) {
+            val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
+            if (others.isEmpty()) return
+            val screen = screenOf(now.spot.id)
+            val pool = others.filter { screenOf(it.id) != screen }.ifEmpty { others }
+            demoSpot = pickWeighted(pool)
+        }
         val tips = current.tipsOn(now.day).map { it.text }.filter { it != now.tip }
         demoTip = if (tips.isEmpty()) now.tip else tips[demoRandom.nextInt(tips.size)]
-        progress = progress.copy(lastFoundDay = null)
+        // Как будто нашли «вчера»: сегодня можно найти снова, и серия продолжится.
+        progress = progress.copy(lastFoundDay = now.day - 1)
         store.save(progress)
     }
 
@@ -372,9 +450,37 @@ class HideAndSeekController(
     /** Demo: let today's creature hide again. */
     fun resetToday() {
         if (progress.lastFoundDay == today) {
-            progress = progress.copy(lastFoundDay = null)
+            // В режиме демо серия при этом не рвётся: как будто нашли вчера.
+            progress = progress.copy(lastFoundDay = if (demoRehide) today - 1 else null)
             store.save(progress)
         }
+    }
+
+    /**
+     * Demo (панель): перейти к соседнему месту — по сценарию, если он есть и включена перепрятка,
+     * иначе по всем местам дня. Если лису сегодня уже нашли, она прячется снова.
+     */
+    fun demoStepBy(delta: Int) {
+        val current = content ?: return
+        val script = demoScriptSteps
+        if (demoRehide && script.isNotEmpty()) {
+            demoStepState = (demoStepState + delta).mod(script.size)
+        } else {
+            val all = current.spotsOn(today)
+            if (all.isEmpty()) return
+            val index = all.indexOfFirst { it.id == plan?.spot?.id }.coerceAtLeast(0)
+            demoSpot = all[(index + delta).mod(all.size)]
+        }
+        if (progress.isFound(today)) {
+            progress = progress.copy(lastFoundDay = today - 1)
+            store.save(progress)
+        }
+    }
+
+    /** Demo: начать серию находок заново (сами находки и коллекция остаются). */
+    fun resetStreak() {
+        progress = progress.copy(streak = 0)
+        store.save(progress)
     }
 
     /** Demo: forget all progress. */

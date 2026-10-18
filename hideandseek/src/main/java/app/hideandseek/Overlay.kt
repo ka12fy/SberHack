@@ -438,7 +438,11 @@ internal class Celebration(
     val cardImage: ImageBitmap?,
     val title: String,
     val body: String,
+    /** Строка про серию (со второй находки подряд) и она же с прошлым числом — для анимации N−1 → N. */
     val streakLine: String?,
+    val streakLineBefore: String?,
+    /** Круглая серия (3, 5, 10, 20…): больше звёздочек. */
+    val milestone: Boolean,
     val tipTitle: String,
     val tip: String?,
     val messageMs: Long,
@@ -458,12 +462,13 @@ private fun celebrationFor(
     elementOffset: Offset?,
 ): Celebration {
     val progress = controller.progress
-    val values = mapOf(
+    fun valuesFor(streak: Int) = mapOf(
         "name" to plan.creature.name,
-        "streak" to progress.streak.toString(),
-        "streakDays" to TextTemplate.ruDays(progress.streak),
+        "streak" to streak.toString(),
+        "streakDays" to TextTemplate.ruDays(streak),
         "total" to progress.totalFound.toString(),
     )
+    val values = valuesFor(progress.streak)
     val texts = content.texts
     return Celebration(
         id = System.nanoTime(),
@@ -483,6 +488,8 @@ private fun celebrationFor(
         title = TextTemplate.fill(texts.foundTitle, values),
         body = TextTemplate.fill(texts.foundBody, values),
         streakLine = if (progress.streak >= 2) TextTemplate.fill(texts.streak, values) else null,
+        streakLineBefore = if (progress.streak >= 2) TextTemplate.fill(texts.streak, valuesFor(progress.streak - 1)) else null,
+        milestone = isStreakMilestone(progress.streak),
         tipTitle = texts.tipTitle,
         tip = plan.tip,
         messageMs = content.look.messageMs,
@@ -498,7 +505,10 @@ private class Particle(
     val spin: Float,
 )
 
-private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): List<Particle> {
+/** Круглые серии, на которых праздник больше: 3, 5, 10, потом каждые 10. */
+internal fun isStreakMilestone(streak: Int): Boolean = streak == 3 || streak == 5 || (streak >= 10 && streak % 10 == 0)
+
+private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean, milestone: Boolean = false): List<Particle> {
     val random = Random(seed)
     val gold = Color(0xFFFFD54A)
     val palette = listOf(base, gold, Color.White, Color(0xFFFF7EB6), Color(0xFF6EE7B7), Color(0xFF7CC8FF))
@@ -508,14 +518,21 @@ private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): L
         Edge.BOTTOM -> 90f
         Edge.LEFT -> 180f
     }
-    return List(if (rare) 40 else 28) {
+    // На круглой серии звёздочек вдвое больше, и почти все золотые.
+    val count = (if (rare) 40 else 28) * (if (milestone) 2 else 1)
+    return List(count) {
         val degrees = normalDegrees + (random.nextFloat() * 2f - 1f) * 115f
+        val goldChance = when {
+            milestone -> 0.7f
+            rare -> 0.5f
+            else -> 0f
+        }
         Particle(
             angle = (degrees * Math.PI / 180.0).toFloat(),
-            speed = 0.9f + random.nextFloat() * 1.6f,
+            speed = (0.9f + random.nextFloat() * 1.6f) * (if (milestone) 1.25f else 1f),
             radius = 0.035f + random.nextFloat() * 0.05f,
-            color = if (rare && random.nextFloat() < 0.5f) gold else palette[random.nextInt(palette.size)],
-            star = random.nextFloat() < 0.45f,
+            color = if (random.nextFloat() < goldChance) gold else palette[random.nextInt(palette.size)],
+            star = random.nextFloat() < (if (milestone) 0.75f else 0.45f),
             spin = random.nextFloat() * 360f,
         )
     }
@@ -532,7 +549,7 @@ private fun CelebrationLayer(
     val fox = remember { Animatable(if (c.poses != null) 0f else 1f) }
     val card = remember { Animatable(0f) }
     var cardVisible by remember { mutableStateOf(true) }
-    val particles = remember(c.id) { makeParticles(c.id, c.edge, Color(c.creature.color), c.creature.rare) }
+    val particles = remember(c.id) { makeParticles(c.id, c.edge, Color(c.creature.color), c.creature.rare, c.milestone) }
 
     LaunchedEffect(Unit) {
         burst.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
@@ -927,16 +944,14 @@ private fun FoundCardContent(c: Celebration, accent: Color) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             BasicText(c.title, style = TextStyle(color = CardInk, fontSize = 18.sp, fontWeight = FontWeight.Bold))
-            Spacer(Modifier.height(2.dp))
-            BasicText(c.body, style = TextStyle(color = CardInkSoft, fontSize = 14.sp, lineHeight = 19.sp))
+            // Серия — сразу под заголовком, со второй находки подряд.
             val streakLine = c.streakLine
             if (streakLine != null) {
-                Spacer(Modifier.height(4.dp))
-                BasicText(
-                    "🔥 $streakLine",
-                    style = TextStyle(color = CardInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-                )
+                Spacer(Modifier.height(2.dp))
+                StreakLine(before = c.streakLineBefore ?: streakLine, after = streakLine, milestone = c.milestone)
             }
+            Spacer(Modifier.height(2.dp))
+            BasicText(c.body, style = TextStyle(color = CardInkSoft, fontSize = 14.sp, lineHeight = 19.sp))
             val tip = c.tip
             if (tip != null) {
                 Spacer(Modifier.height(8.dp))
@@ -948,6 +963,69 @@ private fun FoundCardContent(c: Celebration, accent: Color) {
                 ) {
                     BasicText(c.tipTitle, style = TextStyle(color = CardInk, fontSize = 12.sp, fontWeight = FontWeight.Bold))
                     BasicText(tip, style = TextStyle(color = CardInk, fontSize = 14.sp, lineHeight = 19.sp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * «🔥 Ты находишь меня N дней подряд!»: сначала с прошлым числом, потом оно сменяется
+ * на новое с «попом», огонёк качается. На круглой серии ([milestone]) из огонька
+ * вылетают золотые звёздочки и «поп» сильнее.
+ */
+@Composable
+private fun StreakLine(before: String, after: String, milestone: Boolean) {
+    val pop = remember { Animatable(0f) }
+    var showAfter by remember { mutableStateOf(before == after) }
+    LaunchedEffect(Unit) {
+        delay(450L) // карточка успевает появиться
+        showAfter = true
+        pop.animateTo(1f, tween(durationMillis = if (milestone) 900 else 600, easing = LinearEasing))
+    }
+    val strength = if (milestone) 0.22f else 0.12f
+    val style = TextStyle(color = CardInk, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+    Box {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicText(
+                "🔥",
+                style = style,
+                modifier = Modifier.graphicsLayer {
+                    val p = pop.value
+                    val bump = sin(PI.toFloat() * p)
+                    rotationZ = sin(p * 4f * PI.toFloat()) * 18f * (1f - p)
+                    scaleX = 1f + 2f * strength * bump
+                    scaleY = 1f + 2f * strength * bump
+                },
+            )
+            Spacer(Modifier.width(4.dp))
+            BasicText(
+                if (showAfter) after else before,
+                style = style,
+                modifier = Modifier
+                    .weight(1f)
+                    .graphicsLayer {
+                        val bump = sin(PI.toFloat() * pop.value)
+                        scaleX = 1f + strength * bump
+                        scaleY = 1f + strength * bump
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                    },
+            )
+        }
+        if (milestone) {
+            // Звёздочки разлетаются из огонька.
+            Canvas(Modifier.matchParentSize()) {
+                val p = pop.value
+                if (p <= 0f || p >= 1f) return@Canvas
+                val origin = Offset(9.dp.toPx(), size.height / 2f)
+                val eased = 1f - (1f - p) * (1f - p)
+                for (i in 0 until 10) {
+                    val angle = (i / 10f) * 2f * PI.toFloat() + 0.3f
+                    val distance = 34.dp.toPx() * eased * (0.7f + 0.3f * ((i * 7) % 5) / 4f)
+                    val center = origin + Offset(cos(angle), sin(angle)) * distance
+                    val alpha = (1f - p).coerceIn(0f, 1f)
+                    val color = if (i % 3 == 0) Color(0xFFFF8A3D) else Color(0xFFFFC23D)
+                    drawPath(star(center, 4.dp.toPx() * (1f - 0.4f * p), 120f * p), color.copy(alpha = alpha))
                 }
             }
         }

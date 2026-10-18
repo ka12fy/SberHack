@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hideandseek.HideAndSeekController
+import ru.hideandseek.nychka.heist.HEIST_STEP
 import kotlinx.coroutines.launch
 
 /**
@@ -32,7 +33,15 @@ import kotlinx.coroutines.launch
  * Открывается вместе с отладочными рамками долгим нажатием на лапку в таб-баре.
  */
 @Composable
-fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun DevPanel(
+    hideAndSeek: HideAndSeekController,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Запустить прикол «Нычка ворует баланс» (на «Главном»). */
+    onHeist: (() -> Unit)? = null,
+    /** Начать сценарий показа заново: первое место → кража → дальше по списку. */
+    onRestart: () -> Unit = { hideAndSeek.restartDemo() },
+) {
     val scope = rememberCoroutineScope()
     val plan = hideAndSeek.plan
     val content = hideAndSeek.content
@@ -73,7 +82,18 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
         )
         DevLine(
             "Прячется",
-            plan?.let { "${it.creature.name} → ${screenName(it.spot.id)} (${it.spot.id})" } ?: "сегодня никто не прячется",
+            plan?.let { "${screenName(it.spot.id)} → ${spotName(it.spot.id)}" }
+                ?: if (hideAndSeek.demoAction != null) "сейчас ${spotName(hideAndSeek.demoAction!!)}" else "сегодня никто не прячется",
+        )
+        val script = hideAndSeek.demoScriptSteps
+        DevLine(
+            "Сценарий",
+            when {
+                script.isEmpty() -> "нет, места случайные"
+                !hideAndSeek.demoRehide -> "включится с перепряткой"
+                else -> "шаг ${hideAndSeek.demoStep % script.size + 1} из ${script.size}" +
+                    " → дальше ${spotName(script[(hideAndSeek.demoStep + 1) % script.size])}"
+            },
         )
         DevLine("Найден", if (hideAndSeek.isFoundToday) "да" else "нет")
         DevLine("Контент", content?.let { "v${it.version}, ${hideAndSeek.contentOrigin}" } ?: "загружается…")
@@ -83,6 +103,11 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DevButton("◀ день", Modifier.weight(1f)) { hideAndSeek.dayShift = shift - 1 }
             DevButton("день ▶", Modifier.weight(1f)) { hideAndSeek.dayShift = shift + 1 }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DevButton("◀ место", Modifier.weight(1f)) { hideAndSeek.demoStepBy(-1) }
+            DevButton("место ▶", Modifier.weight(1f)) { hideAndSeek.demoStepBy(1) }
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -97,9 +122,36 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
                 if (hideAndSeek.demoRehide) "Перепрятка: вкл" else "Перепрятка: выкл",
                 Modifier.weight(1f),
             ) { hideAndSeek.demoRehide = !hideAndSeek.demoRehide }
-            DevButton("Сбросить находки", Modifier.weight(1f)) { hideAndSeek.resetAll() }
+            DevButton("Сбросить серию", Modifier.weight(1f)) { hideAndSeek.resetStreak() }
+        }
+        Spacer(Modifier.height(8.dp))
+        DevButton("Начать сценарий заново", Modifier.fillMaxWidth(), onClick = onRestart)
+        Spacer(Modifier.height(8.dp))
+        DevButton("Сбросить все находки", Modifier.fillMaxWidth()) { hideAndSeek.resetAll() }
+        if (onHeist != null) {
+            Spacer(Modifier.height(8.dp))
+            DevButton("Нычка ворует баланс ▶", Modifier.fillMaxWidth(), onClick = onHeist)
         }
     }
+}
+
+/** Понятное название места для панели; для незнакомых id — сам id. */
+private fun spotName(spotId: String): String = when (spotId) {
+    "main.card" -> "карта"
+    "main.banner" -> "баннер «Узнай свои сильные стороны»"
+    "piggy.goal" -> "копилка с целью (накопил на мечту)"
+    "piggy.pig" -> "свинка"
+    "piggy.archive" -> "строка «Архив»"
+    "tasks.start_card" -> "карточка «Начни делать дела»"
+    "content.hero" -> "карточка «Агент Kids» в карусели"
+    "content.audio" -> "аудио «Три кота три хвоста»"
+    "content.algoritmika_mascot" -> "маскот «Алгоритмики»"
+    "main.edge_right" -> "правый край экрана у карт"
+    "tasks.edge_right" -> "правый край экрана у «Начни делать дела»"
+    "piggy.edge_left" -> "левый край экрана у первой копилки"
+    "content.edge_left" -> "левый край экрана у аудио"
+    HEIST_STEP -> "кража баланса на «Главном»"
+    else -> spotId
 }
 
 /** Вкладка по началу id места (main.banner → «Главный»). */

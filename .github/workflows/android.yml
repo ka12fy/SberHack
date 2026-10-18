@@ -2,7 +2,7 @@ name: Android build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, nychka-heist ]
   pull_request:
   workflow_dispatch:
 
@@ -61,9 +61,12 @@ jobs:
           if-no-files-found: ignore
 
       # Последний APK, скриншоты и лог сборки — в ветке ci-results (перезаписывается каждый раз).
+      # Сборки других веток — в ci-results-<ветка>, чтобы не затирать результаты main.
       - name: Publish results to ci-results branch
         if: always() && github.event_name != 'pull_request'
         run: |
+          OUT_BRANCH=ci-results
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then OUT_BRANCH="ci-results-${GITHUB_REF_NAME}"; fi
           mkdir -p /tmp/out
           cp build.log /tmp/out/ 2>/dev/null || true
           cp app/build/outputs/roborazzi/*.png /tmp/out/ 2>/dev/null || true
@@ -73,9 +76,9 @@ jobs:
           cp -r app/build/reports/tests/* /tmp/out/test-reports/ 2>/dev/null || true
           echo "${GITHUB_SHA}" > /tmp/out/SHA
           cd /tmp/out
-          git init -q -b ci-results
+          git init -q -b "${OUT_BRANCH}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -q -m "CI results for ${GITHUB_SHA}"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-results
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" "${OUT_BRANCH}"
