@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "enabled": true,
   "timeZone": "Europe/Moscow",
   "salt": "nychka-2026",
@@ -47,7 +47,12 @@
     { "id": "tasks.start_card",         "edge": "top",   "align": 0.85, "weight": 2 },
     { "id": "content.hero",             "edge": "top",   "align": 0.8,  "weight": 2 },
     { "id": "content.audio",            "edge": "top",   "align": 0.85, "weight": 1 },
-    { "id": "content.algoritmika_mascot", "edge": "left", "align": 0.5, "weight": 1 }
+    { "id": "content.algoritmika_mascot", "edge": "left", "align": 0.5, "weight": 1 },
+
+    { "id": "main.edge_right",          "edge": "left",  "align": 0.3, "run": "left",  "weight": 2 },
+    { "id": "tasks.edge_right",         "edge": "left",  "align": 0.5, "run": "left",  "weight": 2 },
+    { "id": "piggy.edge_left",          "edge": "right", "align": 0.5, "run": "right", "weight": 2 },
+    { "id": "content.edge_left",        "edge": "right", "align": 0.5, "run": "right", "weight": 2 }
   ],
 
   "tips": [

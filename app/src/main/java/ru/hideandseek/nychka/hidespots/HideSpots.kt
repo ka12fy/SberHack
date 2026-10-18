@@ -1,13 +1,18 @@
 package ru.hideandseek.nychka.hidespots
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
@@ -93,6 +98,25 @@ val LocalHideSpotRegistry = staticCompositionLocalOf<HideSpotRegistry?> { null }
  * (рамки по долгому нажатию на лапку) и в модуле «Прятки», который рисует персонажа.
  */
 fun Modifier.hideSpot(id: String): Modifier = spot(id, SpotKind.Allowed).hidingSpot(id)
+
+/**
+ * Место у края экрана: невидимая полоска в 1 dp по высоте блока, прижатая к правому ([right])
+ * или левому краю. Ставится внутрь Box на всю ширину экрана. Полоска прокручивается вместе
+ * с блоком, поэтому и лиса едет вместе с экраном.
+ *
+ * В контенте у правого края экрана лиса выглядывает из-за левой стороны полоски
+ * (`"edge": "left"`), у левого — из-за правой (`"edge": "right"`).
+ */
+@Composable
+fun BoxScope.ScreenEdgeSpot(id: String, right: Boolean) {
+    Box(
+        Modifier
+            .matchParentSize()
+            .wrapContentWidth(if (right) Alignment.End else Alignment.Start)
+            .width(1.dp)
+            .hideSpot(id),
+    )
+}
 
 /** Элемент, который Нычка не должна перекрывать. */
 fun Modifier.noHideZone(id: String): Modifier = spot(id, SpotKind.Forbidden)

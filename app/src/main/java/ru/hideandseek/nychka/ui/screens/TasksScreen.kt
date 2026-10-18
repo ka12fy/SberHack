@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.hideandseek.nychka.R
+import ru.hideandseek.nychka.hidespots.ScreenEdgeSpot
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.ui.components.ArrowTile
 import ru.hideandseek.nychka.ui.components.GradientButton
@@ -87,7 +88,11 @@ fun TasksScreen(modifier: Modifier = Modifier) {
             PlusButton(Modifier.hideSpot("tasks.add"))
         }
         Spacer(Modifier.height(41.dp))
-        StartCard()
+        Box(Modifier.fillMaxWidth()) {
+            StartCard()
+            // Лиса может выглянуть из-за правого края экрана у карточки.
+            ScreenEdgeSpot("tasks.edge_right", right = true)
+        }
         Spacer(Modifier.height(46.dp))
         WhatToDo()
         Spacer(Modifier.navigationBarsPadding().height(124.dp))

@@ -43,6 +43,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.hideandseek.nychka.R
+import ru.hideandseek.nychka.hidespots.ScreenEdgeSpot
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.hidespots.noHideZone
 import ru.hideandseek.nychka.ui.components.Art
@@ -98,7 +99,11 @@ fun PiggyScreen(modifier: Modifier = Modifier) {
     LazyColumn(modifier.fillMaxSize().background(KidsColors.Page)) {
         item(key = "header") { Header() }
         items(Banks, key = { it.id }) { bank ->
-            BankCard(bank, Modifier.padding(top = 16.dp))
+            Box(Modifier.fillMaxWidth()) {
+                BankCard(bank, Modifier.padding(top = 16.dp))
+                // Лиса может выглянуть из-за левого края экрана у первой копилки.
+                if (bank == Banks.first()) ScreenEdgeSpot("piggy.edge_left", right = false)
+            }
         }
         item(key = "goal") { GoalReachedCard(Modifier.padding(top = 16.dp)) }
         items(BanksAfterGoal, key = { it.id }) { bank ->

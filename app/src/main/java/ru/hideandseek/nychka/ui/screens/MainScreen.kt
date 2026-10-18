@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import ru.hideandseek.nychka.R
+import ru.hideandseek.nychka.hidespots.ScreenEdgeSpot
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.hidespots.noHideZone
 import ru.hideandseek.nychka.ui.components.Art
@@ -162,6 +163,8 @@ private fun CardWithBalance() {
                 .fillMaxWidth()
                 .height(71.dp),
         )
+        // Лиса может выглянуть из-за правого края экрана у карт (выше баланса).
+        ScreenEdgeSpot("main.edge_right", right = true)
     }
 }
 

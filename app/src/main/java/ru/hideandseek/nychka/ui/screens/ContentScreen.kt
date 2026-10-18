@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.hideandseek.nychka.R
+import ru.hideandseek.nychka.hidespots.ScreenEdgeSpot
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.hidespots.noHideZone
 import ru.hideandseek.nychka.ui.components.Art
@@ -106,7 +107,13 @@ fun ContentScreen(modifier: Modifier = Modifier) {
             }
         }
         item(key = "stories") { Stories() }
-        item(key = "audio") { AudioCard(Modifier.padding(top = 33.dp)) }
+        item(key = "audio") {
+            Box(Modifier.fillMaxWidth()) {
+                AudioCard(Modifier.padding(top = 33.dp))
+                // Лиса может выглянуть из-за левого края экрана у аудио.
+                ScreenEdgeSpot("content.edge_left", right = false)
+            }
+        }
         item(key = "chips") { FilterChips(Modifier.padding(top = 43.dp)) }
         item(key = "card_1") {
             ContentCard(
