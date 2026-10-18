@@ -42,18 +42,25 @@ fun AppRoot(
     initialTab: Tab = Tab.Main,
     initialDebug: Boolean = false,
     heist: BalanceHeist = remember { BalanceHeist() },
-    /** Через сколько мс на «Главном» после запуска сам начнётся прикол «Нычка ворует баланс»; 0 — только из панели демо. */
+    /** Через сколько мс после захода на «Главный» сам начнётся прикол «Нычка ворует баланс»; 0 — только из панели демо. */
     heistAutoStartMs: Long = 0L,
+    /** Можно ли сейчас начать прикол самому (например, сегодня день кражи и её ещё не было). */
+    heistAllowed: () -> Boolean = { true },
+    /** Прикол начался сам (запомнить, что сегодня он уже был). */
+    onHeistAutoStarted: () -> Unit = {},
 ) {
     val registry = remember { HideSpotRegistry() }
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     var debug by rememberSaveable { mutableStateOf(initialDebug) }
     val hideAndSeek = LocalHideAndSeek.current
 
-    LaunchedEffect(heistAutoStartMs) {
-        if (heistAutoStartMs > 0) {
+    LaunchedEffect(heistAutoStartMs, tab) {
+        if (heistAutoStartMs > 0 && tab == Tab.Main && heistAllowed()) {
             delay(heistAutoStartMs)
-            if (tab == Tab.Main && !heist.running) heist.start()
+            if (tab == Tab.Main && !heist.running && heistAllowed()) {
+                heist.start()
+                onHeistAutoStarted()
+            }
         }
     }
 
