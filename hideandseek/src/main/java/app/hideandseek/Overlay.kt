@@ -422,6 +422,8 @@ internal class Celebration(
     /** Точка на краю элемента в момент находки, в координатах слоя. */
     val anchor: Offset,
     val spotId: String,
+    /** Куда убегать: true — влево, false — вправо, null — к ближайшему краю экрана. */
+    val runLeft: Boolean?,
     /** Та же точка относительно левого верхнего угла элемента; null — не следить за элементом. */
     val elementOffset: Offset?,
     val edge: Edge,
@@ -468,6 +470,7 @@ private fun celebrationFor(
         creature = plan.creature,
         anchor = anchor,
         spotId = plan.spot.id,
+        runLeft = plan.spot.runLeft,
         elementOffset = elementOffset,
         edge = plan.spot.edge,
         sizePx = sizePx,
@@ -821,7 +824,7 @@ private fun DrawScope.drawFoxCelebration(c: Celebration, a: Offset, poses: Loade
         }
         else -> {
             val p = ((ms - jumpsEnd) / FOX_RUN_MS).coerceIn(0f, 1f)
-            val toLeft = fitted.x < size.width / 2f
+            val toLeft = c.runLeft ?: (fitted.x < size.width / 2f)
             val target = if (toLeft) -thirdSize.width else size.width + thirdSize.width
             val x = ground.x + (target - ground.x) * p * p
             val bob = abs(sin(p * 3f * PI.toFloat())) * 8.dp.toPx()

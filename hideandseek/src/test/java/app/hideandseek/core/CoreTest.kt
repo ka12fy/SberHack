@@ -164,6 +164,23 @@ class CoreTest {
         }
     }
 
+    @Test
+    fun spotRunDirectionParses() {
+        val parsed = ContentParser.parse(
+            """
+            { "spots": [
+                { "id": "r", "edge": "left", "run": "left" },
+                { "id": "l", "edge": "right", "run": "Right" },
+                { "id": "n" }, { "id": "x", "run": "up" }
+            ] }
+            """.trimIndent(),
+        )
+        assertEquals(true, parsed.spot("r")!!.runLeft)
+        assertEquals(false, parsed.spot("l")!!.runLeft)
+        assertNull(parsed.spot("n")!!.runLeft)
+        assertNull(parsed.spot("x")!!.runLeft)
+    }
+
     // ---- Sprites ----
 
     @Test

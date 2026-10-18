@@ -91,6 +91,11 @@ data class SpotDef(
     /** Optional CSS selector, so a website element can be a spot without editing the site. */
     val webSelector: String? = null,
     val window: DateWindow = DateWindow.Always,
+    /**
+     * Куда лиса убегает после находки: true — влево, false — вправо, null — к ближайшему краю экрана.
+     * Нужно для мест у края экрана: выглянула справа — убегает влево, и наоборот.
+     */
+    val runLeft: Boolean? = null,
 )
 
 data class TipDef(val text: String, val window: DateWindow = DateWindow.Always)
@@ -317,6 +322,11 @@ object ContentParser {
             weight = o.int("weight") ?: 1,
             webSelector = o.string("web"),
             window = window(o),
+            runLeft = when (o.string("run")?.lowercase()) {
+                "left", "start" -> true
+                "right", "end" -> false
+                else -> null
+            },
         )
     }
 
