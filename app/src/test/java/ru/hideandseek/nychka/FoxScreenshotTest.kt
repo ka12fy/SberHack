@@ -315,7 +315,7 @@ class FoxScreenshotTest {
         show(Tab.Main, contentWith(listOf(Spot("main.edge_right", "left", 0.3, run = "left"))))
         capture("33_fox_screen_edge")
         find()
-        advance(1_800)
+        advance(1_400) // шаги времени в тесте «плывут» примерно на треть — это уже середина бега
         capture("34_fox_screen_edge_runs_left")
     }
 
