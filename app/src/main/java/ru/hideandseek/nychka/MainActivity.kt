@@ -27,7 +27,7 @@ object NychkaConfig {
      * Режим демо для защиты: после находки Нычка сразу прячется в другом месте
      * (а не ждёт завтра). Переключается и в панели демо. В настоящем приложении — false.
      */
-    const val DEMO_REHIDE = true
+    const val DEMO_REHIDE = false
 }
 
 class MainActivity : ComponentActivity() {
